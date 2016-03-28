@@ -7,6 +7,34 @@ use std::net::TcpStream;
 
 use std::sync::mpsc::{channel, Sender, Receiver};
 
+fn handle_socket<T: Read + Write>(mut stream: T, rx: Receiver<String>) {
+    loop {
+        let mut net_buffer = String::new();
+        stream.read_to_string(&mut net_buffer);
+        print!("{}", net_buffer);
+
+        match rx.try_recv() {
+            Ok(m) => {
+                let result = stream.write(m.as_bytes());
+                stream.flush();
+                result
+            },
+            Err(_) => Ok(0)
+        };
+    }
+}
+
+fn handle_stdin(tx: Sender<String>) {
+    let stdin = std::io::stdin();
+    let mut handle = stdin.lock();
+
+    loop {
+        let mut std_buffer = String::new();
+        handle.read_line(&mut std_buffer);
+        tx.send(std_buffer);
+    }
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
     let program = args[0].clone();
@@ -31,29 +59,8 @@ fn main() {
 
     let (tx, rx): (Sender<String>, Receiver<String>) = channel();
     std::thread::spawn(move || {
-            loop {
-                let mut net_buffer = String::new();
-                stream.read_to_string(&mut net_buffer);
-                print!("{}", net_buffer);
-
-                match rx.try_recv() {
-                    Ok(m) => {
-                        let result = stream.write(m.as_bytes());
-                        stream.flush();
-                        result
-                    },
-                    Err(_) => Ok(0)
-                };
-            }
+            handle_socket(stream, rx);
         });
 
-    let stdin = std::io::stdin();
-    let mut handle = stdin.lock();
-
-    loop {
-        let mut std_buffer = String::new();
-        handle.read_line(&mut std_buffer);
-        tx.send(std_buffer);
-    }
-
+    handle_stdin(tx);
 }
