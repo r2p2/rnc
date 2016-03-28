@@ -3,7 +3,7 @@ use getopts::Options;
 use std::env;
 
 use std::io::prelude::*;
-use std::net::TcpStream;
+use std::net::{TcpStream, TcpListener};
 
 use std::sync::mpsc::{channel, Sender, Receiver};
 
@@ -35,6 +35,26 @@ fn handle_stdin(tx: Sender<String>) {
     }
 }
 
+fn create_stream(host: String, port: String, server: bool) -> TcpStream {
+    let dst = &*format!("{}:{}", host, port);
+
+    if server {
+        let listener = TcpListener::bind(dst).unwrap();
+        match listener.accept() {
+            Ok((stream, _)) => {
+                stream.set_read_timeout(Some(std::time::Duration::new(0, 1000)));
+                stream
+            },
+            Err(e) => panic!(e)
+        }
+    }
+    else {
+        let stream = TcpStream::connect(dst).unwrap();
+        stream.set_read_timeout(Some(std::time::Duration::new(0, 1000)));
+        stream
+    }
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
     let program = args[0].clone();
@@ -51,11 +71,9 @@ fn main() {
 
     let host = matches.opt_str("h").unwrap();
     let port = matches.opt_str("p").unwrap();
-    // let as_server = matches.opt_present("l");
+    let as_server = matches.opt_present("l");
 
-    let mut stream = TcpStream::connect(
-        &*format!("{}:{}", host, port)).unwrap();
-    stream.set_read_timeout(Some(std::time::Duration::new(0, 1000)));
+    let mut stream = create_stream(host, port, as_server);
 
     let (tx, rx): (Sender<String>, Receiver<String>) = channel();
     std::thread::spawn(move || {
