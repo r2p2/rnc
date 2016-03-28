@@ -1,0 +1,7 @@
+[package]
+name = "rnc"
+version = "0.1.0"
+authors = ["r2p2"]
+
+[dependencies]
+getopts = "0.2"
